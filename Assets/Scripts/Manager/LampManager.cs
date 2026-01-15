@@ -1,11 +1,12 @@
 // using UnityEngine;
 // using UnityEngine.UI;
+// using UnityEngine.EventSystems;
 //
 // public class LampManager : MonoBehaviour
 // {
 //     public static LampManager Instance;
 //
-//     public GameObject lampControlPanel; // 右侧 Panel
+//     public GameObject lampControlPanel;
 //     public Slider intensitySlider;
 //
 //     private Lamp currentLamp;
@@ -13,23 +14,47 @@
 //     void Awake()
 //     {
 //         Instance = this;
-//         lampControlPanel.SetActive(false); // 初始隐藏
+//         lampControlPanel.SetActive(false);
 //     }
 //
-//     // 点击灯时调用
+//     void Update()
+//     {
+//         if (Input.GetMouseButtonDown(0))
+//         {
+//             // 如果点在 UI 上，不做任何事（允许 Slider 正常工作）
+//             if (EventSystem.current != null &&
+//                 EventSystem.current.IsPointerOverGameObject())
+//             {
+//                 return;
+//             }
+//
+//             // 点在 3D 世界，但不是灯 → 取消选中
+//             if (!IsClickLamp())
+//             {
+//                 DeselectLamp();
+//             }
+//         }
+//     }
+//
+//     // ===== 选中灯 =====
 //     public void SelectLamp(Lamp lamp)
 //     {
-//         currentLamp = lamp;
+//         // 如果点的是另一个灯，先取消上一个
+//         if (currentLamp != null && currentLamp != lamp)
+//         {
+//             currentLamp.SetHighlight(false);
+//         }
 //
-//         // 弹出面板
+//         currentLamp = lamp;
+//         currentLamp.SetHighlight(true);
+//
 //         lampControlPanel.SetActive(true);
 //
-//         // 初始化 Slider
-//         intensitySlider.value = 0.5f;
-//         OnSliderChanged(0.5f);
+//         intensitySlider.value = 0f;
+//         OnSliderChanged(0f);
 //     }
 //
-//     // Slider 变化时调用
+//     // ===== Slider =====
 //     public void OnSliderChanged(float value)
 //     {
 //         if (currentLamp != null)
@@ -38,26 +63,71 @@
 //         }
 //     }
 //
-//     // 可选：关闭面板
-//     public void ClosePanel()
+//     // ===== 取消选中 =====
+//     public void DeselectLamp()
 //     {
+//         if (currentLamp != null)
+//         {
+//             currentLamp.SetHighlight(false);
+//             currentLamp = null;
+//         }
+//
 //         lampControlPanel.SetActive(false);
-//         currentLamp = null;
 //     }
+//
+//     // ===== 判断是否点到灯 =====
+//     bool IsClickLamp()
+//     {
+//         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+//         return Physics.Raycast(ray, out RaycastHit hit) &&
+//                hit.collider.GetComponent<Lamp>() != null;
+//     }
+//     
+//     public void ClosePanel()
+//      {
+//          DeselectLamp();
+//      }
 // }
 
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using TMPro;
 
 public class LampManager : MonoBehaviour
 {
     public static LampManager Instance;
 
+    [Header("Panel")]
     public GameObject lampControlPanel;
-    public Slider intensitySlider;
+
+    [Header("Sliders")]
+    public Slider sliderR;
+    public Slider sliderG;
+    public Slider sliderB;
+    public Slider sliderW;
+
+    [Header("TMP Inputs")]
+    public TMP_InputField inputR;
+    public TMP_InputField inputG;
+    public TMP_InputField inputB;
+    public TMP_InputField inputW;
 
     private Lamp currentLamp;
+    
+    void Start()
+    {
+        // 确保 Slider 有非 0 初始值（即便是 0）
+        sliderR.minValue = 0;
+        sliderR.maxValue = 100;
+        sliderR.value = Mathf.Clamp(currentLamp != null ? currentLamp.R : 0, 0, 100);
+
+        sliderR.onValueChanged.AddListener(OnRChanged);
+        sliderG.onValueChanged.AddListener(OnGChanged);
+        sliderB.onValueChanged.AddListener(OnBChanged);
+        sliderW.onValueChanged.AddListener(OnWChanged);
+    }
+
 
     void Awake()
     {
@@ -69,70 +139,90 @@ public class LampManager : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
         {
-            // 如果点在 UI 上，不做任何事（允许 Slider 正常工作）
+            // 点 UI 不取消
             if (EventSystem.current != null &&
                 EventSystem.current.IsPointerOverGameObject())
-            {
                 return;
-            }
 
-            // 点在 3D 世界，但不是灯 → 取消选中
+            // 点空白
             if (!IsClickLamp())
-            {
                 DeselectLamp();
-            }
         }
     }
 
     // ===== 选中灯 =====
     public void SelectLamp(Lamp lamp)
     {
-        // 如果点的是另一个灯，先取消上一个
         if (currentLamp != null && currentLamp != lamp)
-        {
             currentLamp.SetHighlight(false);
-        }
 
         currentLamp = lamp;
         currentLamp.SetHighlight(true);
 
         lampControlPanel.SetActive(true);
-
-        intensitySlider.value = 0f;
-        OnSliderChanged(0f);
+        SyncUIFromLamp();
     }
 
-    // ===== Slider =====
-    public void OnSliderChanged(float value)
+    // ===== Slider → 灯 =====
+    public void OnRChanged(float v) { if (currentLamp) { currentLamp.SetR(v); SetInput(inputR, v); } }
+    public void OnGChanged(float v) { if (currentLamp) { currentLamp.SetG(v); SetInput(inputG, v); } }
+    public void OnBChanged(float v) { if (currentLamp) { currentLamp.SetB(v); SetInput(inputB, v); } }
+    public void OnWChanged(float v) { if (currentLamp) { currentLamp.SetW(v); SetInput(inputW, v); } }
+
+    // ===== TMP Input → Slider =====
+    public void InputR(string s) { SetFromInput(s, sliderR); }
+    public void InputG(string s) { SetFromInput(s, sliderG); }
+    public void InputB(string s) { SetFromInput(s, sliderB); }
+    public void InputW(string s) { SetFromInput(s, sliderW); }
+
+    // ===== 同步 UI =====
+    void SyncUIFromLamp()
     {
-        if (currentLamp != null)
-        {
-            currentLamp.SetIntensity(value);
-        }
+        sliderR.value = currentLamp.R;
+        sliderG.value = currentLamp.G;
+        sliderB.value = currentLamp.B;
+        sliderW.value = currentLamp.W;
+
+        SetInput(inputR, currentLamp.R);
+        SetInput(inputG, currentLamp.G);
+        SetInput(inputB, currentLamp.B);
+        SetInput(inputW, currentLamp.W);
     }
 
-    // ===== 取消选中 =====
+    void SetInput(TMP_InputField input, float v)
+    {
+        // 直接更新输入框，不触发 OnValueChanged
+        input.SetTextWithoutNotify(Mathf.RoundToInt(v).ToString());
+    }
+
+    void SetFromInput(string s, Slider slider)
+    {
+        if (float.TryParse(s, out float v))
+            slider.value = Mathf.Clamp(v, 0, 100); // 保证在 0~100
+    }
+
+    // ===== 取消选择 =====
     public void DeselectLamp()
     {
         if (currentLamp != null)
-        {
             currentLamp.SetHighlight(false);
-            currentLamp = null;
-        }
 
+        currentLamp = null;
         lampControlPanel.SetActive(false);
     }
 
-    // ===== 判断是否点到灯 =====
     bool IsClickLamp()
     {
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         return Physics.Raycast(ray, out RaycastHit hit) &&
                hit.collider.GetComponent<Lamp>() != null;
     }
-    
+
     public void ClosePanel()
-     {
-         DeselectLamp();
-     }
+    {
+        DeselectLamp();
+    }
 }
+
+
+
