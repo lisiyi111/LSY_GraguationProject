@@ -8,7 +8,7 @@ public class SceneBinSaver : MonoBehaviour
     // 每组灯数量（必须与真实硬件一致）
     public int[] groupLampCounts = new int[31]
     {
-        12,12,9,11,12,12,12,12,   // 假设前 8 组 12 灯（你说第一组是 12）
+        12,12,9,11,12,12,12,12,
         9,11,12,12,12,12,9,11,
         12,12,12,12,9,11,12,
         12,12,12,9,11,12,12,16
@@ -148,4 +148,5 @@ public class SceneBinSaver : MonoBehaviour
 
         return (byte)(sum & 0xFF);
     }
+    
 }
