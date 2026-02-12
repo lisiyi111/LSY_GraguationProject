@@ -1,138 +1,3 @@
-// using UnityEngine;
-// using UnityEngine.UI;
-// using UnityEngine.EventSystems;
-// using TMPro;
-//
-// public class LampManager : MonoBehaviour
-// {
-//     public static LampManager Instance;
-//
-//     [Header("Panel")]
-//     public GameObject lampControlPanel;
-//
-//     [Header("Sliders")]
-//     public Slider sliderR;
-//     public Slider sliderG;
-//     public Slider sliderB;
-//     public Slider sliderW;
-//
-//     [Header("TMP Inputs")]
-//     public TMP_InputField inputR;
-//     public TMP_InputField inputG;
-//     public TMP_InputField inputB;
-//     public TMP_InputField inputW;
-//
-//     private Lamp currentLamp;
-//     
-//     void Start()
-//     {
-//         // 确保 Slider 有非 0 初始值（即便是 0）
-//         sliderR.minValue = 0;
-//         sliderR.maxValue = 100;
-//         sliderR.value = Mathf.Clamp(currentLamp != null ? currentLamp.R : 0, 0, 100);
-//
-//         sliderR.onValueChanged.AddListener(OnRChanged);
-//         sliderG.onValueChanged.AddListener(OnGChanged);
-//         sliderB.onValueChanged.AddListener(OnBChanged);
-//         sliderW.onValueChanged.AddListener(OnWChanged);
-//     }
-//
-//
-//     void Awake()
-//     {
-//         Instance = this;
-//         lampControlPanel.SetActive(false);
-//     }
-//
-//     void Update()
-//     {
-//         if (Input.GetMouseButtonDown(0))
-//         {
-//             // 点 UI 不取消
-//             if (EventSystem.current != null &&
-//                 EventSystem.current.IsPointerOverGameObject())
-//                 return;
-//
-//             // 点空白
-//             if (!IsClickLamp())
-//                 DeselectLamp();
-//         }
-//     }
-//
-//     // ===== 选中灯 =====
-//     public void SelectLamp(Lamp lamp)
-//     {
-//         if (currentLamp != null && currentLamp != lamp)
-//             currentLamp.SetHighlight(false);
-//
-//         currentLamp = lamp;
-//         currentLamp.SetHighlight(true);
-//
-//         lampControlPanel.SetActive(true);
-//         SyncUIFromLamp();
-//     }
-//
-//     // ===== Slider → 灯 =====
-//     public void OnRChanged(float v) { if (currentLamp) { currentLamp.SetR(v); SetInput(inputR, v); } }
-//     public void OnGChanged(float v) { if (currentLamp) { currentLamp.SetG(v); SetInput(inputG, v); } }
-//     public void OnBChanged(float v) { if (currentLamp) { currentLamp.SetB(v); SetInput(inputB, v); } }
-//     public void OnWChanged(float v) { if (currentLamp) { currentLamp.SetW(v); SetInput(inputW, v); } }
-//
-//     // ===== TMP Input → Slider =====
-//     public void InputR(string s) { SetFromInput(s, sliderR); }
-//     public void InputG(string s) { SetFromInput(s, sliderG); }
-//     public void InputB(string s) { SetFromInput(s, sliderB); }
-//     public void InputW(string s) { SetFromInput(s, sliderW); }
-//
-//     // ===== 同步 UI =====
-//     void SyncUIFromLamp()
-//     {
-//         sliderR.value = currentLamp.R;
-//         sliderG.value = currentLamp.G;
-//         sliderB.value = currentLamp.B;
-//         sliderW.value = currentLamp.W;
-//
-//         SetInput(inputR, currentLamp.R);
-//         SetInput(inputG, currentLamp.G);
-//         SetInput(inputB, currentLamp.B);
-//         SetInput(inputW, currentLamp.W);
-//     }
-//
-//     void SetInput(TMP_InputField input, float v)
-//     {
-//         // 直接更新输入框，不触发 OnValueChanged
-//         input.SetTextWithoutNotify(Mathf.RoundToInt(v).ToString());
-//     }
-//
-//     void SetFromInput(string s, Slider slider)
-//     {
-//         if (float.TryParse(s, out float v))
-//             slider.value = Mathf.Clamp(v, 0, 100); // 保证在 0~100
-//     }
-//
-//     // ===== 取消选择 =====
-//     public void DeselectLamp()
-//     {
-//         if (currentLamp != null)
-//             currentLamp.SetHighlight(false);
-//
-//         currentLamp = null;
-//         lampControlPanel.SetActive(false);
-//     }
-//
-//     bool IsClickLamp()
-//     {
-//         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-//         return Physics.Raycast(ray, out RaycastHit hit) &&
-//                hit.collider.GetComponent<Lamp>() != null;
-//     }
-//
-//     public void ClosePanel()
-//     {
-//         DeselectLamp();
-//     }
-// }
-
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -354,12 +219,38 @@ public class LampManager : MonoBehaviour
             currentLamp.SetCameraState(on);
         }
     }
+    
+    // ================= 隐式 Commit（生成 / 切面 / Reset 前调用） =================
+    public void CommitCurrentLamp()
+    {
+        if (currentLamp == null) return;
+
+        // 第一组
+        currentLamp.SetR(sliderR.value);
+        currentLamp.SetG(sliderG.value);
+        currentLamp.SetB(sliderB.value);
+        currentLamp.SetW(sliderW.value);
+
+        // 第二组
+        currentLamp.SetR2(sliderR2.value);
+        currentLamp.SetG2(sliderG2.value);
+        currentLamp.SetB2(sliderB2.value);
+        currentLamp.SetW2(sliderW2.value);
+
+        // 摄像头
+        if (cameraToggle != null && currentLamp.hasCamera)
+        {
+            currentLamp.SetCameraState(cameraToggle.isOn);
+        }
+    }
 
 
     public void ClosePanel()
     {
+        CommitCurrentLamp();
         DeselectLamp();
     }
+    
 }
 
 
