@@ -7,6 +7,9 @@ public class LampManager : MonoBehaviour
 {
     public static LampManager Instance;
 
+    [Header("Reset Confirm UI")]
+    public GameObject resetConfirmPanel;   // 确认弹窗面板
+    
     [Header("Camera UI")]
     public Toggle cameraToggle;
     public GameObject cameraPanel;   // 包住 Toggle 的父物体（方便整体隐藏）
@@ -46,6 +49,9 @@ public class LampManager : MonoBehaviour
     {
         Instance = this;
         lampControlPanel.SetActive(false);
+
+        if (resetConfirmPanel != null)
+            resetConfirmPanel.SetActive(false);
     }
 
     void Start()
@@ -249,6 +255,51 @@ public class LampManager : MonoBehaviour
     {
         CommitCurrentLamp();
         DeselectLamp();
+    }
+    
+    //重置参数
+    public void OnClickResetAll()
+    {
+        CommitCurrentLamp();   // 防止当前灯数据丢失
+
+        if (resetConfirmPanel != null)
+            resetConfirmPanel.SetActive(true);
+    }
+    
+    public void ConfirmResetAll()
+    {
+        if (resetConfirmPanel != null)
+            resetConfirmPanel.SetActive(false);
+
+        ExecuteResetAll();
+    }
+    
+    public void CancelResetAll()
+    {
+        if (resetConfirmPanel != null)
+            resetConfirmPanel.SetActive(false);
+    }
+    
+    void ExecuteResetAll()
+    {
+        // 获取所有灯（包含隐藏）
+        Lamp[] allLamps = FindObjectsOfType<Lamp>(true);
+
+        foreach (var lamp in allLamps)
+        {
+            lamp.ResetAllData();
+        }
+
+        // 清除当前选中
+        if (currentLamp != null)
+            currentLamp.SetHighlight(false);
+
+        currentLamp = null;
+
+        // 关闭控制面板
+        lampControlPanel.SetActive(false);
+
+        Debug.Log("所有灯已重置");
     }
     
 }

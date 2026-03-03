@@ -1,48 +1,3 @@
-// using UnityEngine;
-//
-// public class Lamp : MonoBehaviour
-// {
-//     public Light lampLight;
-//     public Material lampMat;
-//
-//     [Header("Highlight")]
-//     public GameObject highlight;   // 红色高亮物体
-//
-//     private float intensity = 0f;
-//
-//     void Awake()
-//     {
-//         if (lampLight == null)
-//             lampLight = GetComponent<Light>();
-//
-//         lampMat = GetComponent<Renderer>().material;
-//
-//         SetIntensity(intensity);
-//         SetHighlight(false); // 初始不选中
-//     }
-//
-//     // ===== 设置亮度 =====
-//     public void SetIntensity(float value)
-//     {
-//         intensity = value;
-//         lampLight.intensity = intensity * 20f;
-//         lampMat.SetColor("_EmissionColor", Color.blue * intensity);
-//     }
-//
-//     // ===== 控制高亮 =====
-//     public void SetHighlight(bool show)
-//     {
-//         if (highlight != null)
-//             highlight.SetActive(show);
-//     }
-//
-//     // ===== 点击灯 =====
-//     void OnMouseDown()
-//     {
-//         LampManager.Instance.SelectLamp(this);
-//     }
-// }
-
 using UnityEngine;
 
 
@@ -129,6 +84,7 @@ public class Lamp : MonoBehaviour
         LampManager.Instance.SelectLamp(this);
     }
     
+    
     public void SetCameraState(bool on)
     {
         if (!hasCamera)
@@ -139,6 +95,28 @@ public class Lamp : MonoBehaviour
 
         cameraOn = on;
     }
+    
+    public void ResetAllData()
+    {
+        // 第一组
+        R = 0;
+        G = 0;
+        B = 0;
+        W = 0;
+
+        // 第二组
+        R2 = 0;
+        G2 = 0;
+        B2 = 0;
+        W2 = 0;
+
+        // 摄像头
+        cameraOn = false;
+
+        // 更新显示
+        ApplyLight();
+    }
+
 }
 
 
