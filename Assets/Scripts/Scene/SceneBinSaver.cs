@@ -7,6 +7,9 @@ using System.Linq;
 
 public class SceneBinSaver : MonoBehaviour
 {
+    [Header("Scene List")]
+    public List<SceneData> scenes = new List<SceneData>();
+    
     // 每组灯数量（必须与真实硬件一致）
     public int[] groupLampCounts = new int[31]
     {
@@ -47,10 +50,79 @@ public class SceneBinSaver : MonoBehaviour
 
         using (BinaryWriter bw = new BinaryWriter(File.Open(path, FileMode.Create)))
         {
-            WriteSceneData(bw);
+            //WriteSceneData(bw);
+            
+            foreach (var scene in scenes)
+            {
+                WriteOneScene(bw, scene);
+            }
         }
 
         Debug.Log("保存完成：" + path);
+    }
+    
+    void WriteOneScene(BinaryWriter bw, SceneData scene)
+    {
+        for (int groupId = 1; groupId <= 31; groupId++)
+        {
+            List<LampData> lamps = scene.groups[groupId];
+            int lampCount = groupLampCounts[groupId - 1];
+
+            // 1. 头
+            bw.Write((byte)0xF5);
+
+            // 2. 摄像头
+            bool camState = false;
+            foreach (var lamp in lamps)
+            {
+                if (lamp.hasCamera)
+                {
+                    camState = lamp.cameraOn;
+                    break;
+                }
+            }
+
+            byte groupState = BuildGroupStateByte(groupId, camState);
+            bw.Write(groupState);
+
+            List<byte> checksumData = new List<byte>();
+            checksumData.Add(groupState);
+
+            // 3. 数据区
+            byte[] dataBlock = new byte[lampCount * 8];
+
+            foreach (var lamp in lamps)
+            {
+                int idx = lamp.lampIndex;
+                if (idx < 0 || idx >= lampCount) continue;
+
+                int baseOffset = idx * 8;
+
+                dataBlock[baseOffset + 0] = lamp.R;
+                dataBlock[baseOffset + 1] = lamp.G;
+                dataBlock[baseOffset + 2] = lamp.B;
+                dataBlock[baseOffset + 3] = lamp.W;
+
+                dataBlock[baseOffset + 4] = lamp.R2;
+                dataBlock[baseOffset + 5] = lamp.G2;
+                dataBlock[baseOffset + 6] = lamp.B2;
+                dataBlock[baseOffset + 7] = lamp.W2;
+            }
+
+            foreach (byte b in dataBlock)
+            {
+                bw.Write(b);
+                checksumData.Add(b);
+            }
+
+            // 4. 校验
+            byte checksum = CalcChecksum(checksumData);
+            bw.Write((byte)(checksum >> 4));
+            bw.Write((byte)(checksum & 0x0F));
+
+            // 5. 结束
+            bw.Write((byte)0xFC);
+        }
     }
 
     // ===== 原有写入逻辑（完整保留）=====
@@ -179,4 +251,66 @@ public class SceneBinSaver : MonoBehaviour
         return (byte)(sum & 0xFF);
     }
     
+    public void AddCurrentScene()
+    {
+        // 提交当前编辑
+        if (LampManager.Instance != null)
+            LampManager.Instance.CommitCurrentLamp();
+
+        Lamp[] allLamps = FindObjectsOfType<Lamp>(true);
+
+        SceneData scene = new SceneData();
+
+        // 初始化31组
+        for (int i = 1; i <= 31; i++)
+            scene.groups[i] = new List<LampData>();
+
+        foreach (var lamp in allLamps)
+        {
+            LampData data = new LampData()
+            {
+                groupId = lamp.groupId,
+                lampIndex = lamp.lampIndex,
+
+                R = (byte)lamp.R,
+                G = (byte)lamp.G,
+                B = (byte)lamp.B,
+                W = (byte)lamp.W,
+
+                R2 = (byte)lamp.R2,
+                G2 = (byte)lamp.G2,
+                B2 = (byte)lamp.B2,
+                W2 = (byte)lamp.W2,
+
+                hasCamera = lamp.hasCamera,
+                cameraOn = lamp.cameraOn
+            };
+
+            scene.groups[lamp.groupId].Add(data);
+        }
+
+        scenes.Add(scene);
+
+        Debug.Log("添加场景成功，总数：" + scenes.Count);
+    }
+
+    public void MoveSceneUp(int index)
+    {
+        if (index <= 0 || index >= scenes.Count) return;
+
+        var temp = scenes[index];
+        scenes[index] = scenes[index - 1];
+        scenes[index - 1] = temp;
+    }
+
+    public void MoveSceneDown(int index)
+    {
+        if (index < 0 || index >= scenes.Count - 1) return;
+
+        var temp = scenes[index];
+        scenes[index] = scenes[index + 1];
+        scenes[index + 1] = temp;
+    }
+    
 }
+
