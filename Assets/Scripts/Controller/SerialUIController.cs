@@ -1,13 +1,21 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.IO;
+using TMPro;
 
 public class SerialUIController : MonoBehaviour
 {
-    public Dropdown portDropdown;
-    public InputField baudInput;
-    public Text filePathText;
 
+ 
+    public TMP_InputField inputGap;
+    public TMP_InputField inputScene;
+    public TMP_InputField inputLoop;
+
+    public TMP_Dropdown portDropdown;
+    public TMP_InputField baudInput;
+    public TMP_Text filePathText;
+
+    
     private string selectedFilePath;
 
     void Start()
@@ -19,21 +27,24 @@ public class SerialUIController : MonoBehaviour
     public void RefreshPorts()
     {
         portDropdown.ClearOptions();
-
+    
         var ports = SerialManager.Instance.GetAvailablePorts();
-
+    
         portDropdown.AddOptions(new System.Collections.Generic.List<string>(ports));
     }
+    
 
     // ===== 打开串口 =====
     public void OnOpenPort()
     {
         string port = portDropdown.options[portDropdown.value].text;
         int baud = int.Parse(baudInput.text);
-
+    
         SerialManager.Instance.SetPort(port, baud);
         SerialManager.Instance.OpenPort();
     }
+    
+    
 
     // ===== 选择 BIN 文件 =====
     public void OnSelectFile()
@@ -61,9 +72,7 @@ public class SerialUIController : MonoBehaviour
     }
     
     // ===== 按钮调用这个 =====
-    public InputField inputGap;
-    public InputField inputScene;
-    public InputField inputLoop;
+    
     public void OnSendRunCommand()
     {
         int gap = int.Parse(inputGap.text);
