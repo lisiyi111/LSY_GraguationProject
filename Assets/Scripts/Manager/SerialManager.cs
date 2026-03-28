@@ -70,7 +70,9 @@ public class SerialManager : MonoBehaviour
         if (serialPort != null && serialPort.IsOpen)
         {
             serialPort.Write(data, 0, data.Length);
-            Debug.Log("发送：" + BitConverter.ToString(data));
+            string msg = "发送：" + BitConverter.ToString(data);
+            Debug.Log(msg);
+            UILogger.Instance?.Log(msg); // ⭐新增
         }
     }
 
@@ -85,6 +87,7 @@ public class SerialManager : MonoBehaviour
                 {
                     string msg = serialPort.ReadLine();
                     Debug.Log("接收：" + msg);
+                    UILogger.Instance?.Log("接收：" + msg);
 
                     ParseMessage(msg);
                 }
@@ -198,6 +201,7 @@ public class SerialManager : MonoBehaviour
         byte[] fileData = System.IO.File.ReadAllBytes(filePath);
 
         Debug.Log("开始发送BIN文件，大小：" + fileData.Length);
+        UILogger.Instance?.Log("开始发送BIN文件：" + fileData.Length + "字节");
 
         // 👉 分包发送（防止串口堵塞）
         int packetSize = 64;
@@ -215,6 +219,7 @@ public class SerialManager : MonoBehaviour
         }
 
         Debug.Log("BIN发送完成");
+        UILogger.Instance?.Log("BIN发送完成");
     }
 }
     

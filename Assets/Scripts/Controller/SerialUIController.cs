@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.IO;
 using TMPro;
+using SFB;
 
 public class SerialUIController : MonoBehaviour
 {
@@ -49,13 +50,22 @@ public class SerialUIController : MonoBehaviour
     // ===== 选择 BIN 文件 =====
     public void OnSelectFile()
     {
-#if UNITY_EDITOR
-        selectedFilePath = UnityEditor.EditorUtility.OpenFilePanel("选择BIN文件", "", "bin");
-#endif
+        var paths = StandaloneFileBrowser.OpenFilePanel("选择BIN文件", "", "bin", false);
 
-        if (!string.IsNullOrEmpty(selectedFilePath))
+        if (paths != null && paths.Length > 0 && !string.IsNullOrEmpty(paths[0]))
         {
-            filePathText.text = selectedFilePath;
+            selectedFilePath = paths[0];
+
+            // 显示完整路径
+            // filePathText.text = selectedFilePath;
+            //显示文件名
+            filePathText.text = Path.GetFileName(selectedFilePath);
+
+            Debug.Log("已选择文件：" + selectedFilePath);
+        }
+        else
+        {
+            Debug.Log("未选择文件");
         }
     }
 
