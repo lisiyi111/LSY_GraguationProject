@@ -111,4 +111,14 @@ public class SerialUIController : MonoBehaviour
 
         SerialManager.Instance.SendRunCommand(gap, scene, loop);
     }
+    
+    public void OnSendClear()
+    {
+        SerialManager.Instance.SendClearCommand();
+    }
+
+    public void OnSendCheck()
+    {
+        SerialManager.Instance.SendCheckCommand();
+    }
 }
