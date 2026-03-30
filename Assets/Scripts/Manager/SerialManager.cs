@@ -43,10 +43,12 @@ public class SerialManager : MonoBehaviour
             receiveThread.Start();
 
             Debug.Log("串口打开成功");
+            UILogger.Instance?.Log($"Serial port opened successfully");
         }
         catch (Exception e)
         {
             Debug.LogError("串口打开失败：" + e.Message);
+            UILogger.Instance?.Log($"Serial port opening failed:" + e.Message);
         }
     }
 
@@ -62,6 +64,7 @@ public class SerialManager : MonoBehaviour
             serialPort.Close();
 
         Debug.Log("串口已关闭");
+        UILogger.Instance?.Log($"The serial port is closed");
     }
 
     // ===== 发送数据 =====
@@ -70,9 +73,9 @@ public class SerialManager : MonoBehaviour
         if (serialPort != null && serialPort.IsOpen)
         {
             serialPort.Write(data, 0, data.Length);
-            string msg = "发送：" + BitConverter.ToString(data);
+            string msg = " TX: " + BitConverter.ToString(data);
+            UILogger.Instance?.Log(msg);
             Debug.Log(msg);
-            UILogger.Instance?.Log(msg); // ⭐新增
         }
     }
 
@@ -87,7 +90,7 @@ public class SerialManager : MonoBehaviour
                 {
                     string msg = serialPort.ReadLine();
                     Debug.Log("接收：" + msg);
-                    UILogger.Instance?.Log("接收：" + msg);
+                    UILogger.Instance?.Log(" RX: " + msg);
 
                     ParseMessage(msg);
                 }
@@ -201,7 +204,7 @@ public class SerialManager : MonoBehaviour
         byte[] fileData = System.IO.File.ReadAllBytes(filePath);
 
         Debug.Log("开始发送BIN文件，大小：" + fileData.Length);
-        UILogger.Instance?.Log("开始发送BIN文件：" + fileData.Length + "字节");
+        UILogger.Instance?.Log($"BIN send start：{fileData.Length} byte");
 
         // 👉 分包发送（防止串口堵塞）
         int packetSize = 64;
@@ -219,7 +222,7 @@ public class SerialManager : MonoBehaviour
         }
 
         Debug.Log("BIN发送完成");
-        UILogger.Instance?.Log("BIN发送完成");
+        UILogger.Instance?.Log("BIN sent successfully");
     }
 }
     

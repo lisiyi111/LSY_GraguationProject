@@ -13,7 +13,7 @@ public class SerialUIController : MonoBehaviour
     public TMP_InputField inputLoop;
 
     public TMP_Dropdown portDropdown;
-    public TMP_InputField baudInput;
+    public TMP_Dropdown baudDropdown;
     public TMP_Text filePathText;
 
     
@@ -22,6 +22,7 @@ public class SerialUIController : MonoBehaviour
     void Start()
     {
         RefreshPorts();
+        InitBaudRates();
     }
 
     // ===== 刷新串口 =====
@@ -34,13 +35,32 @@ public class SerialUIController : MonoBehaviour
         portDropdown.AddOptions(new System.Collections.Generic.List<string>(ports));
     }
     
+    void InitBaudRates()
+    {
+        baudDropdown.ClearOptions();
+
+        var baudList = new System.Collections.Generic.List<string>()
+        {
+            "9600",
+            "19200",
+            "38400",
+            "57600",
+            "115200"
+        };
+
+        baudDropdown.AddOptions(baudList);
+
+        baudDropdown.value = 4; // 默认115200
+    }
+    
 
     // ===== 打开串口 =====
     public void OnOpenPort()
     {
         string port = portDropdown.options[portDropdown.value].text;
-        int baud = int.Parse(baudInput.text);
-    
+
+        int baud = int.Parse(baudDropdown.options[baudDropdown.value].text);
+
         SerialManager.Instance.SetPort(port, baud);
         SerialManager.Instance.OpenPort();
     }
