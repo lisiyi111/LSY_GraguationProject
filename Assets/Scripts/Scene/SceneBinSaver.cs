@@ -65,6 +65,11 @@ public class SceneBinSaver : MonoBehaviour
     {
         for (int groupId = 1; groupId <= 31; groupId++)
         {
+            if (!scene.groups.ContainsKey(groupId))
+            {
+                scene.groups[groupId] = new List<LampData>();
+            }
+
             List<LampData> lamps = scene.groups[groupId];
             int lampCount = groupLampCounts[groupId - 1];
 
@@ -293,24 +298,99 @@ public class SceneBinSaver : MonoBehaviour
 
         Debug.Log("添加场景成功，总数：" + scenes.Count);
     }
-
-    public void MoveSceneUp(int index)
+    
+    
+    public void ApplySceneToLamps(int sceneIndex)
     {
-        if (index <= 0 || index >= scenes.Count) return;
+        if (sceneIndex < 0 || sceneIndex >= scenes.Count) return;
 
-        var temp = scenes[index];
-        scenes[index] = scenes[index - 1];
-        scenes[index - 1] = temp;
+        SceneData scene = scenes[sceneIndex];
+
+        Lamp[] allLamps = FindObjectsOfType<Lamp>(true);
+
+        foreach (var lamp in allLamps)
+        {
+            var list = scene.groups[lamp.groupId];
+
+            foreach (var data in list)
+            {
+                if (data.lampIndex == lamp.lampIndex)
+                {
+                    lamp.SetR(data.R);
+                    lamp.SetG(data.G);
+                    lamp.SetB(data.B);
+                    lamp.SetW(data.W);
+
+                    lamp.SetR2(data.R2);
+                    lamp.SetG2(data.G2);
+                    lamp.SetB2(data.B2);
+                    lamp.SetW2(data.W2);
+
+                    lamp.SetCameraState(data.cameraOn);
+                    break;
+                }
+            }
+        }
+
+        Debug.Log("已应用场景：" + (sceneIndex + 1 ));
     }
-
-    public void MoveSceneDown(int index)
+    
+    public void InsertScene(int index)
     {
-        if (index < 0 || index >= scenes.Count - 1) return;
+        if (LampManager.Instance != null)
+            LampManager.Instance.CommitCurrentLamp();
 
-        var temp = scenes[index];
-        scenes[index] = scenes[index + 1];
-        scenes[index + 1] = temp;
+        SceneData scene = CaptureCurrentScene();
+
+        if (index < 0 || index > scenes.Count)
+        {
+            Debug.LogError("插入位置非法：" + index);
+            return;
+        }
+
+        scenes.Insert(index, scene);
+
+        Debug.Log("插入成功，当前场景数：" + scenes.Count);
     }
+    
+    SceneData CaptureCurrentScene()
+    {
+        Lamp[] allLamps = FindObjectsOfType<Lamp>(true);
+
+        SceneData scene = new SceneData();
+
+        // ⭐⭐⭐ 必须初始化
+        scene.groups = new Dictionary<int, List<LampData>>();
+        for (int i = 1; i <= 31; i++)
+            scene.groups[i] = new List<LampData>();
+
+        foreach (var lamp in allLamps)
+        {
+            LampData data = new LampData()
+            {
+                groupId = lamp.groupId,
+                lampIndex = lamp.lampIndex,
+
+                R = (byte)lamp.R,
+                G = (byte)lamp.G,
+                B = (byte)lamp.B,
+                W = (byte)lamp.W,
+
+                R2 = (byte)lamp.R2,
+                G2 = (byte)lamp.G2,
+                B2 = (byte)lamp.B2,
+                W2 = (byte)lamp.W2,
+
+                hasCamera = lamp.hasCamera,
+                cameraOn = lamp.cameraOn
+            };
+
+            scene.groups[lamp.groupId].Add(data);
+        }
+
+        return scene;
+    }
+    
     
 }
 
