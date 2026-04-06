@@ -17,31 +17,6 @@ public class UILogger : MonoBehaviour
     {
         Instance = this;
     }
-
-    // public void Log(string msg)
-    // {
-    //     string time = DateTime.Now.ToString("HH:mm:ss");
-    //     string line = $"[{time}] {msg}";
-    //
-    //     // 是否在底部
-    //     bool isAtBottom = scrollRect.verticalNormalizedPosition <= 0.01f;
-    //
-    //     content += line + "\n";
-    //
-    //     if (content.Length > 8000)
-    //         content = content.Substring(content.Length - 8000);
-    //
-    //     logText.text = content;
-    //
-    //     LayoutRebuilder.ForceRebuildLayoutImmediate(scrollRect.content);
-    //     Canvas.ForceUpdateCanvases();
-    //
-    //     // 只在底部才滚动
-    //     if (isAtBottom)
-    //     {
-    //         scrollRect.verticalNormalizedPosition = 0f;
-    //     }
-    // }
     
 
     public void Log(string msg)

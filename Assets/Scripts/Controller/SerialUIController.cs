@@ -18,11 +18,20 @@ public class SerialUIController : MonoBehaviour
 
     
     private string selectedFilePath;
+    public TMP_Text btnText;
 
+    private bool isOpen;
+    
+    bool IsSerialOpen()
+    {
+        return SerialManager.Instance != null && SerialManager.Instance.IsOpen();
+    }
     void Start()
     {
         RefreshPorts();
         InitBaudRates();
+        isOpen = false;
+        btnText.text = "打开串口";
     }
 
     // ===== 刷新串口 =====
@@ -51,6 +60,25 @@ public class SerialUIController : MonoBehaviour
         baudDropdown.AddOptions(baudList);
 
         baudDropdown.value = 4; // 默认115200
+    }
+    
+
+
+    public void OnClickToggleSerial()
+    {
+        if (!isOpen)
+        {
+            //SerialManager.Instance.OpenPort();
+            OnOpenPort();
+            btnText.text = "关闭串口";
+            isOpen = true;
+        }
+        else
+        {
+            SerialManager.Instance.ClosePort();
+            btnText.text = "打开串口";
+            isOpen = false;
+        }
     }
     
 
@@ -95,6 +123,19 @@ public class SerialUIController : MonoBehaviour
         if (string.IsNullOrEmpty(selectedFilePath))
         {
             Debug.LogError("未选择文件！");
+            return;
+        }
+
+        if (SerialManager.Instance == null)
+        {
+            Debug.LogError("串口管理器不存在！");
+            return;
+        }
+
+        // ⭐ 防止串口没开就发送
+        if (!IsSerialOpen())
+        {
+            Debug.LogError("串口未打开！");
             return;
         }
 

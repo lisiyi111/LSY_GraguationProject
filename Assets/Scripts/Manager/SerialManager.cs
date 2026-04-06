@@ -14,11 +14,18 @@ public class SerialManager : MonoBehaviour
     private Queue<string> msgQueue = new Queue<string>();
     private object lockObj = new object();
     
+    private Queue<byte[]> dataQueue = new Queue<byte[]>();
+    
     private List<byte> bufferCache = new List<byte>();
 
     private SerialPort serialPort;
     private Thread receiveThread;
     private bool isRunning = false;
+    
+    public bool IsOpen()
+    {
+        return serialPort != null && serialPort.IsOpen;
+    }
 
     void Awake()
     {
@@ -54,7 +61,30 @@ public class SerialManager : MonoBehaviour
 
                 count++;
             }
+            // ⭐ 处理数据（主线程）
+            while (dataQueue.Count > 0)
+            {
+                var data = dataQueue.Dequeue();
+
+                // ⭐ 放到主线程解析
+                HandleData(data);
+            }
         }
+    }
+    
+    void HandleData(byte[] buffer)
+    {
+        // ===== 拼包缓存 =====
+        bufferCache.AddRange(buffer);
+
+        // ===== 解析 =====
+        TryParseBuffer();
+
+        // ===== 字符串协议 =====
+        string text = System.Text.Encoding.UTF8.GetString(buffer);
+
+        if (!string.IsNullOrWhiteSpace(text))
+            ParseTextProtocol(text);
     }
 
     public void SetPort(string port, int baud)
@@ -97,8 +127,10 @@ public class SerialManager : MonoBehaviour
     {
         isRunning = false;
 
-        if (receiveThread != null)
-            receiveThread.Join();   // ✅ 不再用Abort
+        if (receiveThread != null && receiveThread.IsAlive)
+        {
+            receiveThread.Join(100); // ⭐ 最多等100ms
+        }
 
         if (serialPort != null && serialPort.IsOpen)
             serialPort.Close();
@@ -136,27 +168,41 @@ public class SerialManager : MonoBehaviour
                         byte[] buffer = new byte[count];
                         serialPort.Read(buffer, 0, count);
 
+                        // lock (lockObj)
+                        // {
+                        //     // ===== HEX显示 =====
+                        //     msgQueue.Enqueue("HEX: " + BitConverter.ToString(buffer));
+                        //
+                        //     // ===== 字符串显示 =====
+                        //     string text = System.Text.Encoding.UTF8.GetString(buffer);
+                        //
+                        //     if (!string.IsNullOrWhiteSpace(text))
+                        //     {
+                        //         msgQueue.Enqueue("STR: " + text);
+                        //
+                        //         // ⭐⭐⭐ 关键：直接解析字符串协议
+                        //         ParseTextProtocol(text);
+                        //     }
+                        //     
+                        //
+                        //     // ===== ⭐ 加入缓存 =====
+                        //     bufferCache.AddRange(buffer);
+                        //
+                        //     // ===== ⭐ 尝试解析 =====
+                        //     TryParseBuffer();
+                        // }
+                        
                         lock (lockObj)
                         {
-                            // ===== HEX显示 =====
                             msgQueue.Enqueue("HEX: " + BitConverter.ToString(buffer));
 
-                            // ===== 字符串显示 =====
                             string text = System.Text.Encoding.UTF8.GetString(buffer);
 
                             if (!string.IsNullOrWhiteSpace(text))
-                            {
                                 msgQueue.Enqueue("STR: " + text);
 
-                                // ⭐⭐⭐ 关键：直接解析字符串协议
-                                ParseTextProtocol(text);
-                            }
-
-                            // ===== ⭐ 加入缓存 =====
-                            bufferCache.AddRange(buffer);
-
-                            // ===== ⭐ 尝试解析 =====
-                            TryParseBuffer();
+                            // ⭐ 只丢数据，不解析
+                            dataQueue.Enqueue(buffer);
                         }
                     }
                 }
@@ -332,7 +378,8 @@ public class SerialManager : MonoBehaviour
 
         byte[] fileData = System.IO.File.ReadAllBytes(filePath);
 
-        UILogger.Instance?.Log($"BIN send start: {fileData.Length} bytes");
+        //UILogger.Instance?.Log($"BIN send start: {fileData.Length} bytes");
+        msgQueue.Enqueue($"BIN send start: {fileData.Length} bytes");
 
         int packetSize = 64;
 
@@ -348,6 +395,7 @@ public class SerialManager : MonoBehaviour
             Thread.Sleep(5);
         }
 
-        UILogger.Instance?.Log("BIN send done");
+        //UILogger.Instance?.Log("BIN send done");
+        msgQueue.Enqueue("BIN send done");
     }
 }

@@ -4,11 +4,16 @@ using System.IO;
 using SFB;
 using System.IO;
 using System.Linq;
+using TMPro;
 
 public class SceneBinSaver : MonoBehaviour
 {
     [Header("Scene List")]
     public List<SceneData> scenes = new List<SceneData>();
+
+    [Header("Generate Confirm UI")]
+    public GameObject generateConfirmPanel;
+    public TMP_Text generateConfirmText;
     
     // 每组灯数量（必须与真实硬件一致）
     public int[] groupLampCounts = new int[31]
@@ -19,8 +24,63 @@ public class SceneBinSaver : MonoBehaviour
         12,12,12,9,11,12,12,16
     };
     
+    void Start()
+    {
+        if (generateConfirmPanel != null)
+            generateConfirmPanel.SetActive(false);
+    }
+
     // ===== 按钮调用 =====
     public void SaveCurrentSceneToBin()
+    {
+        // 有弹窗就先确认；没有弹窗则按原逻辑直接保存
+        if (generateConfirmPanel != null)
+        {
+            ShowGenerateConfirm();
+            return;
+        }
+
+        ExecuteSaveCurrentSceneToBin();
+    }
+
+    // ===== 生成前确认 =====
+    void ShowGenerateConfirm()
+    {
+        if (generateConfirmText != null)
+        {
+            generateConfirmText.text = $"是否保存当前场景？\n当前场景数为（{scenes.Count}）";
+        }
+
+        generateConfirmPanel.SetActive(true);
+    }
+
+    // 点击“是”：先Add当前场景，再生成
+    public void ConfirmGenerateAddCurrentScene()
+    {
+        if (generateConfirmPanel != null)
+            generateConfirmPanel.SetActive(false);
+
+        AddCurrentScene();
+        ExecuteSaveCurrentSceneToBin();
+    }
+
+    // 点击“否”：不Add当前场景，直接生成
+    public void ConfirmGenerateWithoutAdd()
+    {
+        if (generateConfirmPanel != null)
+            generateConfirmPanel.SetActive(false);
+
+        ExecuteSaveCurrentSceneToBin();
+    }
+
+    // 点击“取消”：关闭弹窗，不进行生成
+    public void CancelGenerateConfirm()
+    {
+        if (generateConfirmPanel != null)
+            generateConfirmPanel.SetActive(false);
+    }
+
+    void ExecuteSaveCurrentSceneToBin()
     {
         // 生成前，隐式提交当前正在编辑的灯
         if (LampManager.Instance != null)
