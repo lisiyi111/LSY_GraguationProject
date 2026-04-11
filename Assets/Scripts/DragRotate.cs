@@ -3,6 +3,18 @@ using UnityEngine.EventSystems;
 
 public class DragRotate : MonoBehaviour
 {
+    [Header("双击复位（仅编辑模式，串口模式下无效）")]
+    [Tooltip("两次左键按下间隔小于此值则视为双击")]
+    public float doubleClickMaxInterval = 0.45f;
+    [Tooltip("两次按下之间允许的最大像素距离平方；设为 0 表示不限制（推荐，避免拖一下后第二次点偏了判失败）")]
+    public float doubleClickMaxSqrPixelDist = 0f;
+    [Tooltip("不拖时自动查找；也可手动指定")]
+    public UIStateController uiStateController;
+    [Tooltip("多相机时请拖观察球体的相机；空则 Camera.main")]
+    public Camera viewCamera;
+    [Tooltip("球面只有灯碰撞体时，双击打在灯上也可复位旋转（否则需有无 Lamp 的碰撞体才算空白）")]
+    public bool allowDoubleClickWhenHitsLampToo = true;
+
     [Header("Mouse Sensitivity (degree per pixel)")]
     [Tooltip("1 像素对应的旋转角度，建议 0.03 ~ 0.08")]
     public float mouseSensitivity = 0.05f;
@@ -18,21 +30,28 @@ public class DragRotate : MonoBehaviour
     private bool dragRight;
     private Vector3 lastMousePos;
 
-    // 记录上下旋转累计角（绕 X 轴）
     private float verticalAngle = 0f;
 
     private Quaternion initialRotation;
     private Coroutine resetCoroutine;
 
+    float lastLeftDownTime;
+    Vector2 lastLeftDownPos;
+    bool pendingFirstClickQualified;
+    bool skipLeftDragFromDoubleClick;
+
     void Start()
     {
-        // 记录初始旋转，用于 Reset
+        if (uiStateController == null)
+            uiStateController = FindObjectOfType<UIStateController>();
+        if (viewCamera == null)
+            viewCamera = Camera.main;
+
         initialRotation = transform.rotation;
     }
 
     void Update()
     {
-        // ===== 1. UI 上不允许旋转 =====
         if (EventSystem.current != null &&
             EventSystem.current.IsPointerOverGameObject())
         {
@@ -40,15 +59,79 @@ public class DragRotate : MonoBehaviour
             return;
         }
 
-        HandleLeftMouse();   // 左键左右
-        HandleRightMouse();  // 右键上下
+        skipLeftDragFromDoubleClick = false;
+        TryHandleDoubleClickReset();
+
+        HandleLeftMouse();
+        HandleRightMouse();
     }
 
-    /* ================= 左键：左右旋转 ================= */
+    void TryHandleDoubleClickReset()
+    {
+        if (uiStateController != null && uiStateController.IsSerialMode)
+        {
+            pendingFirstClickQualified = false;
+            return;
+        }
+
+        if (!Input.GetMouseButtonDown(0)) return;
+
+        Camera cam = viewCamera != null ? viewCamera : Camera.main;
+        if (cam == null) return;
+
+        Vector2 pos = Input.mousePosition;
+        bool qualified = ClickQualifiesForDoubleReset(cam, pos);
+
+        float t = Time.time;
+        bool distOk = doubleClickMaxSqrPixelDist <= 0f ||
+                      (pos - lastLeftDownPos).sqrMagnitude <= doubleClickMaxSqrPixelDist;
+
+        if (pendingFirstClickQualified &&
+            qualified &&
+            t - lastLeftDownTime <= doubleClickMaxInterval &&
+            distOk)
+        {
+            ResetRotation();
+            dragLeft = false;
+            pendingFirstClickQualified = false;
+            lastLeftDownTime = 0f;
+            skipLeftDragFromDoubleClick = true;
+            return;
+        }
+
+        lastLeftDownTime = t;
+        lastLeftDownPos = pos;
+        pendingFirstClickQualified = qualified;
+    }
+
+    bool ClickQualifiesForDoubleReset(Camera cam, Vector2 screenPos)
+    {
+        // 与左键拖拽一致：点在「场景里」、未挡 UI 即可；射线打不到任何碰撞体（天空/空白）也算有效
+        Ray ray = cam.ScreenPointToRay(screenPos);
+        RaycastHit[] hits = Physics.RaycastAll(ray, 2000f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+        if (hits.Length == 0)
+            return true;
+
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (var h in hits)
+        {
+            if (h.collider == null) continue;
+            if (h.collider.GetComponentInParent<Lamp>() != null)
+                continue;
+            return true;
+        }
+
+        return allowDoubleClickWhenHitsLampToo;
+    }
+
     void HandleLeftMouse()
     {
         if (Input.GetMouseButtonDown(0))
         {
+            if (skipLeftDragFromDoubleClick)
+                return;
+
             dragLeft = true;
             lastMousePos = Input.mousePosition;
         }
@@ -61,13 +144,11 @@ public class DragRotate : MonoBehaviour
         Vector3 delta = Input.mousePosition - lastMousePos;
         float angle = delta.x * mouseSensitivity;
 
-        // 绕世界 Y 轴旋转（左右）
         transform.Rotate(Vector3.up, -angle, Space.World);
 
         lastMousePos = Input.mousePosition;
     }
 
-    /* ================= 右键：上下旋转 ================= */
     void HandleRightMouse()
     {
         if (Input.GetMouseButtonDown(1))
@@ -93,14 +174,10 @@ public class DragRotate : MonoBehaviour
         float realDelta = nextAngle - verticalAngle;
         verticalAngle = nextAngle;
 
-        // 镜头面向 +Z 时，上下应绕世界 X 轴
         transform.Rotate(Vector3.right, realDelta, Space.World);
 
         lastMousePos = Input.mousePosition;
     }
-
-
-    /* ================= 复位接口 ================= */
 
     public void ResetRotation()
     {
@@ -109,15 +186,11 @@ public class DragRotate : MonoBehaviour
 
         if (resetDuration <= 0f)
         {
-            // 瞬间复位
             transform.rotation = initialRotation;
             verticalAngle = 0f;
         }
         else
-        {
-            // 平滑复位
             resetCoroutine = StartCoroutine(ResetRoutine());
-        }
     }
 
     private System.Collections.IEnumerator ResetRoutine()
@@ -139,5 +212,3 @@ public class DragRotate : MonoBehaviour
         resetCoroutine = null;
     }
 }
-
-

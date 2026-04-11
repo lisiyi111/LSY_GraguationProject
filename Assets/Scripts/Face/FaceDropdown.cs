@@ -6,6 +6,8 @@ public class FaceDropdown : MonoBehaviour
 {
     public TMP_Dropdown faceDropdown;
 
+    int lastFaceDropdownIndex;
+
     void Start()
     {
         InitFaceDropdown();
@@ -19,21 +21,29 @@ public class FaceDropdown : MonoBehaviour
         list.Add("");
         for (int i = 0; i < 31; i++)
         {
-                list.Add("Face " + ( i + 1 ) );
+            list.Add("Face " + (i + 1));
         }
 
         faceDropdown.AddOptions(list);
         faceDropdown.SetValueWithoutNotify(0);
         faceDropdown.RefreshShownValue();
+        lastFaceDropdownIndex = 0;
 
         faceDropdown.onValueChanged.AddListener(OnFaceChanged);
     }
 
     void OnFaceChanged(int index)
     {
-        // 0 是占位项，不执行任何选择
-        if (index <= 0) return;
+        if (index <= 0)
+        {
+            lastFaceDropdownIndex = index;
+            return;
+        }
 
-        FindObjectOfType<FaceUIController>().SelectFace(index - 1);
+        var faceCtrl = FindObjectOfType<FaceUIController>();
+        if (faceCtrl == null) return;
+
+        faceCtrl.SelectFace(index - 1);
+        lastFaceDropdownIndex = index;
     }
 }

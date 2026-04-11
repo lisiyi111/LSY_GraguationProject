@@ -21,6 +21,8 @@ public class UIStateController : MonoBehaviour
 
     private bool isSerialMode = false;
     private bool isRotating = false;
+
+    public bool IsSerialMode => isSerialMode;
     
     public ResetController resetController;
 
@@ -36,6 +38,10 @@ public class UIStateController : MonoBehaviour
     // ===== 按钮点击 =====
     public void ToggleMode()
     {
+        var sceneUi = FindObjectOfType<SceneUIController>();
+        if (sceneUi != null && sceneUi.BlockIfEditingScene())
+            return;
+
         isSerialMode = !isSerialMode;
 
         StopAllCoroutines();      

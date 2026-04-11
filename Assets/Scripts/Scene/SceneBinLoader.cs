@@ -5,7 +5,7 @@ using SFB;
 
 public class SceneBinLoader : MonoBehaviour
 {
-    public SceneBinSaver saver; // 拖你的 SceneBinSaver
+    public SceneBinSaver saver;
 
     public void LoadBin()
     {
@@ -18,8 +18,12 @@ public class SceneBinLoader : MonoBehaviour
 
         if (paths.Length == 0) return;
 
-        string path = paths[0];
+        LoadBinFromPath(paths[0]);
+    }
 
+    /// <summary>从路径加载并替换内存中的全部场景（不弹文件框）。</summary>
+    public void LoadBinFromPath(string path)
+    {
         if (saver == null)
         {
             Debug.LogError("SceneBinSaver 没绑定！");
@@ -33,96 +37,102 @@ public class SceneBinLoader : MonoBehaviour
         }
 
         byte[] bytes = File.ReadAllBytes(path);
+        List<SceneData> parsed = TryParseBin(bytes);
+        if (parsed == null)
+            return;
 
         saver.scenes.Clear();
-
-        int offset = 0;
-
-        while (offset < bytes.Length)
-        {
-            SceneData scene = new SceneData();
-
-            // ⭐ 初始化 groups（必须）
-            scene.groups = new Dictionary<int, List<LampData>>();
-            for (int i = 1; i <= 31; i++)
-                scene.groups[i] = new List<LampData>();
-
-            for (int groupId = 1; groupId <= 31; groupId++)
-            {
-                // ===== ⭐ 防越界 =====
-                if (offset + 2 >= bytes.Length)
-                {
-                    Debug.LogError("文件提前结束");
-                    return;
-                }
-
-                // ===== 1. 帧头 =====
-                if (bytes[offset] != 0xF5)
-                {
-                    Debug.LogError($"帧头错误 at {offset}");
-                    return;
-                }
-                offset++;
-
-                // ===== 2. groupState =====
-                byte groupState = bytes[offset++];
-                bool camOn = (groupState & 0b01000000) != 0;
-
-                int lampCount = saver.groupLampCounts[groupId - 1];
-
-                // ===== 3. 数据区 =====
-                for (int i = 0; i < lampCount; i++)
-                {
-                    // ⭐ 防越界
-                    if (offset + 8 > bytes.Length)
-                    {
-                        Debug.LogError("数据区越界");
-                        return;
-                    }
-
-                    LampData lamp = new LampData();
-
-                    lamp.groupId = groupId;
-                    lamp.lampIndex = i;
-
-                    lamp.R  = bytes[offset++];
-                    lamp.G  = bytes[offset++];
-                    lamp.B  = bytes[offset++];
-                    lamp.W  = bytes[offset++];
-
-                    lamp.R2 = bytes[offset++];
-                    lamp.G2 = bytes[offset++];
-                    lamp.B2 = bytes[offset++];
-                    lamp.W2 = bytes[offset++];
-
-                    lamp.cameraOn = camOn;
-
-                    scene.groups[groupId].Add(lamp);
-                }
-
-                // ===== 4. 校验 =====
-                if (offset + 2 > bytes.Length)
-                {
-                    Debug.LogError("校验越界");
-                    return;
-                }
-                offset += 2;
-
-                // ===== 5. 结束位 =====
-                if (offset >= bytes.Length || bytes[offset++] != 0xFC)
-                {
-                    Debug.LogError("帧尾错误");
-                    return;
-                }
-            }
-
-            saver.scenes.Add(scene);
-        }
+        saver.scenes.AddRange(parsed);
 
         Debug.Log("读取完成，场景数：" + saver.scenes.Count);
 
         var ui = FindObjectOfType<SceneUIController>();
         if (ui != null)
             ui.RefreshDropdown();
+    }
+
+    /// <summary>解析 BIN 为场景列表；失败返回 null。</summary>
+    public List<SceneData> TryParseBin(byte[] bytes)
+    {
+        if (saver == null || saver.groupLampCounts == null || saver.groupLampCounts.Length != 31)
+        {
+            Debug.LogError("SceneBinSaver 或 groupLampCounts 无效");
+            return null;
+        }
+
+        var result = new List<SceneData>();
+        int offset = 0;
+
+        while (offset < bytes.Length)
+        {
+            SceneData scene = new SceneData();
+            scene.groups = new Dictionary<int, List<LampData>>();
+            for (int i = 1; i <= 31; i++)
+                scene.groups[i] = new List<LampData>();
+
+            for (int groupId = 1; groupId <= 31; groupId++)
+            {
+                if (offset + 2 >= bytes.Length)
+                {
+                    Debug.LogError("文件提前结束");
+                    return null;
+                }
+
+                if (bytes[offset] != 0xF5)
+                {
+                    Debug.LogError($"帧头错误 at {offset}");
+                    return null;
+                }
+                offset++;
+
+                byte groupState = bytes[offset++];
+                bool camOn = (groupState & 0b01000000) != 0;
+
+                int lampCount = saver.groupLampCounts[groupId - 1];
+
+                for (int i = 0; i < lampCount; i++)
+                {
+                    if (offset + 8 > bytes.Length)
+                    {
+                        Debug.LogError("数据区越界");
+                        return null;
+                    }
+
+                    LampData lamp = new LampData
+                    {
+                        groupId = groupId,
+                        lampIndex = i,
+                        R = bytes[offset++],
+                        G = bytes[offset++],
+                        B = bytes[offset++],
+                        W = bytes[offset++],
+                        R2 = bytes[offset++],
+                        G2 = bytes[offset++],
+                        B2 = bytes[offset++],
+                        W2 = bytes[offset++],
+                        cameraOn = camOn
+                    };
+
+                    scene.groups[groupId].Add(lamp);
+                }
+
+                if (offset + 2 > bytes.Length)
+                {
+                    Debug.LogError("校验越界");
+                    return null;
+                }
+                offset += 2;
+
+                if (offset >= bytes.Length || bytes[offset++] != 0xFC)
+                {
+                    Debug.LogError("帧尾错误");
+                    return null;
+                }
+            }
+
+            result.Add(scene);
+        }
+
+        return result;
     }
 }

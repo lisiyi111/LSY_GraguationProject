@@ -37,6 +37,9 @@ public class SerialUIController : MonoBehaviour
     // ===== 刷新串口 =====
     public void RefreshPorts()
     {
+        if (SceneUIController.Instance != null && SceneUIController.Instance.BlockIfEditingScene())
+            return;
+
         portDropdown.ClearOptions();
     
         var ports = SerialManager.Instance.GetAvailablePorts();
@@ -66,6 +69,9 @@ public class SerialUIController : MonoBehaviour
 
     public void OnClickToggleSerial()
     {
+        if (SceneUIController.Instance != null && SceneUIController.Instance.BlockIfEditingScene())
+            return;
+
         if (!isOpen)
         {
             //SerialManager.Instance.OpenPort();
@@ -85,6 +91,9 @@ public class SerialUIController : MonoBehaviour
     // ===== 打开串口 =====
     public void OnOpenPort()
     {
+        if (SceneUIController.Instance != null && SceneUIController.Instance.BlockIfEditingScene())
+            return;
+
         string port = portDropdown.options[portDropdown.value].text;
 
         int baud = int.Parse(baudDropdown.options[baudDropdown.value].text);
@@ -98,6 +107,9 @@ public class SerialUIController : MonoBehaviour
     // ===== 选择 BIN 文件 =====
     public void OnSelectFile()
     {
+        if (SceneUIController.Instance != null && SceneUIController.Instance.BlockIfEditingScene())
+            return;
+
         var paths = StandaloneFileBrowser.OpenFilePanel("选择BIN文件", "", "bin", false);
 
         if (paths != null && paths.Length > 0 && !string.IsNullOrEmpty(paths[0]))
@@ -120,6 +132,9 @@ public class SerialUIController : MonoBehaviour
     // ===== 发送 BIN =====
     public void OnSendBin()
     {
+        if (SceneUIController.Instance != null && SceneUIController.Instance.BlockIfEditingScene())
+            return;
+
         if (string.IsNullOrEmpty(selectedFilePath))
         {
             Debug.LogError("未选择文件！");
@@ -146,6 +161,9 @@ public class SerialUIController : MonoBehaviour
     
     public void OnSendRunCommand()
     {
+        if (SceneUIController.Instance != null && SceneUIController.Instance.BlockIfEditingScene())
+            return;
+
         int gap = int.Parse(inputGap.text);
         int scene = int.Parse(inputScene.text);
         int loop = int.Parse(inputLoop.text);
@@ -155,11 +173,17 @@ public class SerialUIController : MonoBehaviour
     
     public void OnSendClear()
     {
+        if (SceneUIController.Instance != null && SceneUIController.Instance.BlockIfEditingScene())
+            return;
+
         SerialManager.Instance.SendClearCommand();
     }
 
     public void OnSendCheck()
     {
+        if (SceneUIController.Instance != null && SceneUIController.Instance.BlockIfEditingScene())
+            return;
+
         SerialManager.Instance.SendCheckCommand();
     }
 }

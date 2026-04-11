@@ -45,6 +45,14 @@ public class LampManager : MonoBehaviour
 
     private Lamp currentLamp;
 
+    /// <summary>灯参数在 UI 中变化时触发（用于“编辑下拉场景”等同步回写）。</summary>
+    public event System.Action OnLampValuesChanged;
+
+    void NotifyLampValuesChanged()
+    {
+        OnLampValuesChanged?.Invoke();
+    }
+
     void Awake()
     {
         Instance = this;
@@ -154,27 +162,27 @@ public class LampManager : MonoBehaviour
 
 
     // ================= 第一组：实时灯 =================
-    public void OnRChanged(float v) { if (currentLamp) { currentLamp.SetR(v); SetInput(inputR, v); } }
-    public void OnGChanged(float v) { if (currentLamp) { currentLamp.SetG(v); SetInput(inputG, v); } }
-    public void OnBChanged(float v) { if (currentLamp) { currentLamp.SetB(v); SetInput(inputB, v); } }
-    public void OnWChanged(float v) { if (currentLamp) { currentLamp.SetW(v); SetInput(inputW, v); } }
+    public void OnRChanged(float v) { if (currentLamp) { currentLamp.SetR(v); SetInput(inputR, v); NotifyLampValuesChanged(); } }
+    public void OnGChanged(float v) { if (currentLamp) { currentLamp.SetG(v); SetInput(inputG, v); NotifyLampValuesChanged(); } }
+    public void OnBChanged(float v) { if (currentLamp) { currentLamp.SetB(v); SetInput(inputB, v); NotifyLampValuesChanged(); } }
+    public void OnWChanged(float v) { if (currentLamp) { currentLamp.SetW(v); SetInput(inputW, v); NotifyLampValuesChanged(); } }
 
     // ================= 第二组：内部灯（只存参数） =================
-    public void OnR2Changed(float v) { if (currentLamp) { currentLamp.SetR2(v); SetInput(inputR2, v); } }
-    public void OnG2Changed(float v) { if (currentLamp) { currentLamp.SetG2(v); SetInput(inputG2, v); } }
-    public void OnB2Changed(float v) { if (currentLamp) { currentLamp.SetB2(v); SetInput(inputB2, v); } }
-    public void OnW2Changed(float v) { if (currentLamp) { currentLamp.SetW2(v); SetInput(inputW2, v); } }
+    public void OnR2Changed(float v) { if (currentLamp) { currentLamp.SetR2(v); SetInput(inputR2, v); NotifyLampValuesChanged(); } }
+    public void OnG2Changed(float v) { if (currentLamp) { currentLamp.SetG2(v); SetInput(inputG2, v); NotifyLampValuesChanged(); } }
+    public void OnB2Changed(float v) { if (currentLamp) { currentLamp.SetB2(v); SetInput(inputB2, v); NotifyLampValuesChanged(); } }
+    public void OnW2Changed(float v) { if (currentLamp) { currentLamp.SetW2(v); SetInput(inputW2, v); NotifyLampValuesChanged(); } }
 
     // ================= Input → Slider =================
-    public void InputR(string s) { SetFromInput(s, sliderR); }
-    public void InputG(string s) { SetFromInput(s, sliderG); }
-    public void InputB(string s) { SetFromInput(s, sliderB); }
-    public void InputW(string s) { SetFromInput(s, sliderW); }
+    public void InputR(string s) { SetFromInput(s, sliderR); if (currentLamp) NotifyLampValuesChanged(); }
+    public void InputG(string s) { SetFromInput(s, sliderG); if (currentLamp) NotifyLampValuesChanged(); }
+    public void InputB(string s) { SetFromInput(s, sliderB); if (currentLamp) NotifyLampValuesChanged(); }
+    public void InputW(string s) { SetFromInput(s, sliderW); if (currentLamp) NotifyLampValuesChanged(); }
 
-    public void InputR2(string s) { SetFromInput(s, sliderR2); }
-    public void InputG2(string s) { SetFromInput(s, sliderG2); }
-    public void InputB2(string s) { SetFromInput(s, sliderB2); }
-    public void InputW2(string s) { SetFromInput(s, sliderW2); }
+    public void InputR2(string s) { SetFromInput(s, sliderR2); if (currentLamp) NotifyLampValuesChanged(); }
+    public void InputG2(string s) { SetFromInput(s, sliderG2); if (currentLamp) NotifyLampValuesChanged(); }
+    public void InputB2(string s) { SetFromInput(s, sliderB2); if (currentLamp) NotifyLampValuesChanged(); }
+    public void InputW2(string s) { SetFromInput(s, sliderW2); if (currentLamp) NotifyLampValuesChanged(); }
 
     // ================= 核心按钮：复制第一组 → 当前灯的第二组 =================
     public void CopyGroup1ToGroup2()
@@ -187,6 +195,7 @@ public class LampManager : MonoBehaviour
         currentLamp.W2 = currentLamp.W;
 
         SyncGroup2FromLamp();
+        NotifyLampValuesChanged();
     }
 
     // ================= 工具函数 =================
@@ -223,6 +232,7 @@ public class LampManager : MonoBehaviour
         if (currentLamp != null)
         {
             currentLamp.SetCameraState(on);
+            NotifyLampValuesChanged();
         }
     }
     
@@ -248,6 +258,8 @@ public class LampManager : MonoBehaviour
         {
             currentLamp.SetCameraState(cameraToggle.isOn);
         }
+
+        NotifyLampValuesChanged();
     }
 
 
@@ -298,6 +310,9 @@ public class LampManager : MonoBehaviour
 
         // 关闭控制面板
         lampControlPanel.SetActive(false);
+
+        if (SceneUIController.Instance != null)
+            SceneUIController.Instance.RefreshEditingSceneFromCurrentLamps();
 
         Debug.Log("所有灯已重置");
     }

@@ -1,16 +1,14 @@
 using UnityEngine;
 
 public class FaceUIController : MonoBehaviour
- {
-     public FaceManager faceManager;
-     public FaceLightManager faceLightManager;
- 
-     public void SelectFace(int index)
-     {
-         // ① 旋转球体
-         faceManager.SelectFace(index);
- 
-         // ② 切换灯分组 + 关闭灯面板
-         faceLightManager.SelectFace(index);
-     }
- }
+{
+    public FaceManager faceManager;
+    public FaceLightManager faceLightManager;
+
+    /// <summary>切换朝向面；编辑当前场景模式下也允许使用 Face 下拉。</summary>
+    public void SelectFace(int index)
+    {
+        faceManager.SelectFace(index);
+        faceLightManager.SelectFace(index);
+    }
+}

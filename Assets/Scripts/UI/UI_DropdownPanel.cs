@@ -25,6 +25,9 @@ public class UI_DropdownPanel : MonoBehaviour
     public RectTransform panel;
     public float speed = 10f;
 
+    [Tooltip("勾选后：编辑当前场景时禁止滑出打开（关闭仍允许）")]
+    public bool blockOpenWhenEditingScene;
+
     private Vector2 hiddenPos;
     private Vector2 shownPos;
     private bool isOpen = false;
@@ -50,6 +53,12 @@ public class UI_DropdownPanel : MonoBehaviour
 
     public void TogglePanel()
     {
-        isOpen = !isOpen;
+        bool willOpen = !isOpen;
+        if (willOpen && blockOpenWhenEditingScene &&
+            SceneUIController.Instance != null &&
+            SceneUIController.Instance.BlockIfEditingScene())
+            return;
+
+        isOpen = willOpen;
     }
 }

@@ -33,11 +33,14 @@ public class SceneBinSaver : MonoBehaviour
     // ===== 按钮调用 =====
     public void SaveCurrentSceneToBin()
     {
-        // 有弹窗就先确认；没有弹窗则按原逻辑直接保存
         if (generateConfirmPanel != null)
         {
-            ShowGenerateConfirm();
-            return;
+            var ui = FindObjectOfType<SceneUIController>();
+            if (ui != null && ui.ShouldConfirmBeforeGenerate())
+            {
+                ShowGenerateConfirm();
+                return;
+            }
         }
 
         ExecuteSaveCurrentSceneToBin();
@@ -57,6 +60,10 @@ public class SceneBinSaver : MonoBehaviour
     // 点击“是”：先Add当前场景，再生成
     public void ConfirmGenerateAddCurrentScene()
     {
+        var ui = FindObjectOfType<SceneUIController>();
+        if (ui != null && ui.BlockIfEditingScene())
+            return;
+
         if (generateConfirmPanel != null)
             generateConfirmPanel.SetActive(false);
 
@@ -67,10 +74,14 @@ public class SceneBinSaver : MonoBehaviour
     // 点击“否”：不Add当前场景，直接生成
     public void ConfirmGenerateWithoutAdd()
     {
+        var ui = FindObjectOfType<SceneUIController>();
+        if (ui != null && ui.BlockIfEditingScene())
+            return;
+
         if (generateConfirmPanel != null)
             generateConfirmPanel.SetActive(false);
 
-        ExecuteSaveCurrentSceneToBin();
+        ExecuteSaveCurrentSceneToBin(clearUnsavedLampPromptAfterSuccess: false);
     }
 
     // 点击“取消”：关闭弹窗，不进行生成
@@ -80,7 +91,13 @@ public class SceneBinSaver : MonoBehaviour
             generateConfirmPanel.SetActive(false);
     }
 
-    void ExecuteSaveCurrentSceneToBin()
+    /// <summary>直接导出当前内存场景列表为 BIN，不经过“是否添加当前场景”弹窗（用于加载前保存等）。</summary>
+    public void SaveCurrentSceneToBinDirect()
+    {
+        ExecuteSaveCurrentSceneToBin();
+    }
+
+    void ExecuteSaveCurrentSceneToBin(bool clearUnsavedLampPromptAfterSuccess = true)
     {
         // 生成前，隐式提交当前正在编辑的灯
         if (LampManager.Instance != null)
@@ -119,6 +136,9 @@ public class SceneBinSaver : MonoBehaviour
         }
 
         Debug.Log("保存完成：" + path);
+
+        if (clearUnsavedLampPromptAfterSuccess)
+            FindObjectOfType<SceneUIController>()?.MarkLampEditsCommittedToList();
     }
     
     void WriteOneScene(BinaryWriter bw, SceneData scene)
@@ -413,7 +433,7 @@ public class SceneBinSaver : MonoBehaviour
         Debug.Log("插入成功，当前场景数：" + scenes.Count);
     }
     
-    SceneData CaptureCurrentScene()
+    public SceneData CaptureCurrentScene()
     {
         Lamp[] allLamps = FindObjectsOfType<Lamp>(true);
 

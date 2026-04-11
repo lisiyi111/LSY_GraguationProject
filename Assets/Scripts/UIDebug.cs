@@ -28,6 +28,9 @@ public class UIDebug : MonoBehaviour
 
     void HandleLog(string logString, string stackTrace, LogType type)
     {
+        if (type == LogType.Error || type == LogType.Exception)
+            return;
+
         string time = DateTime.Now.ToString("HH:mm:ss");
 
         string color = "white";
