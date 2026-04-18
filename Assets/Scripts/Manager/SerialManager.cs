@@ -3,6 +3,8 @@ using System.IO.Ports;
 using System.Threading;
 using UnityEngine;
 using System.Collections.Generic;
+using System.Collections;
+using System.IO;
 
 public class SerialManager : MonoBehaviour
 {
@@ -17,10 +19,32 @@ public class SerialManager : MonoBehaviour
     private Queue<byte[]> dataQueue = new Queue<byte[]>();
     
     private List<byte> bufferCache = new List<byte>();
+    private readonly object sceneAckLock = new object();
 
     private SerialPort serialPort;
     private Thread receiveThread;
     private bool isRunning = false;
+    private Coroutine sendBinCoroutine;
+    private bool isSendingBinFile = false;
+    private volatile int waitingAckGroupId = -1;
+    private volatile bool waitingAckReceived = false;
+    
+    private Coroutine sendCoroutine;
+    
+    private bool stopRequested = false;
+    
+
+    [Header("Scene BIN send")]
+    [Min(0.05f)]
+    public float sceneGroupAckTimeoutSeconds = 50f;
+
+    private static readonly int[] SceneGroupLampCounts =
+    {
+        12,12,9,11,12,12,12,12,
+        9,11,12,12,12,12,9,11,
+        12,12,12,12,9,11,12,
+        12,12,12,9,11,12,12,16
+    };
     
     public bool IsOpen()
     {
@@ -32,19 +56,6 @@ public class SerialManager : MonoBehaviour
         Instance = this;
     }
     
-    // void Update()
-    // {
-    //     lock (lockObj)
-    //     {
-    //         while (msgQueue.Count > 0)
-    //         {
-    //             string msg = msgQueue.Dequeue();
-    //
-    //             Debug.Log(msg);
-    //             UILogger.Instance?.Log(msg);
-    //         }
-    //     }
-    // }
     
     void Update()
     {
@@ -76,6 +87,9 @@ public class SerialManager : MonoBehaviour
     {
         // ===== 拼包缓存 =====
         bufferCache.AddRange(buffer);
+        
+        // ===== 直接识别ACK =====
+        TryParseAck();
 
         // ===== 解析 =====
         TryParseBuffer();
@@ -167,30 +181,7 @@ public class SerialManager : MonoBehaviour
                     {
                         byte[] buffer = new byte[count];
                         serialPort.Read(buffer, 0, count);
-
-                        // lock (lockObj)
-                        // {
-                        //     // ===== HEX显示 =====
-                        //     msgQueue.Enqueue("HEX: " + BitConverter.ToString(buffer));
-                        //
-                        //     // ===== 字符串显示 =====
-                        //     string text = System.Text.Encoding.UTF8.GetString(buffer);
-                        //
-                        //     if (!string.IsNullOrWhiteSpace(text))
-                        //     {
-                        //         msgQueue.Enqueue("STR: " + text);
-                        //
-                        //         // ⭐⭐⭐ 关键：直接解析字符串协议
-                        //         ParseTextProtocol(text);
-                        //     }
-                        //     
-                        //
-                        //     // ===== ⭐ 加入缓存 =====
-                        //     bufferCache.AddRange(buffer);
-                        //
-                        //     // ===== ⭐ 尝试解析 =====
-                        //     TryParseBuffer();
-                        // }
+                        
                         
                         lock (lockObj)
                         {
@@ -264,8 +255,11 @@ public class SerialManager : MonoBehaviour
     }
     
     
+    
     void ParseProtocol(byte[] data)
     {
+        
+        // F2帧检测
         if (data.Length == 7 && data[0] == 0xF2 && data[6] == 0xFC)
         {
             //msgQueue.Enqueue("Identified as a line detection frame");
@@ -368,34 +362,228 @@ public class SerialManager : MonoBehaviour
         return 12; // 默认
     }
 
+    // public void SendBinFile(string filePath)
+    // {
+    //     if (serialPort == null || !serialPort.IsOpen)
+    //     {
+    //         Debug.LogError("串口未打开！");
+    //         return;
+    //     }
+    //
+    //     if (sendBinCoroutine != null)
+    //         StopCoroutine(sendBinCoroutine);
+    //
+    //     sendBinCoroutine = StartCoroutine(SendBinByGroup(filePath));
+    // }
+    
+
+    void TryParseAck()
+    {
+        // ACK: AF F5 XX 00 FC
+        while (bufferCache.Count >= 5)
+        {
+            if (bufferCache[0] != 0xAF)
+            {
+                bufferCache.RemoveAt(0);
+                continue;
+            }
+
+            if (bufferCache.Count < 5)
+                return;
+
+            if (bufferCache[1] != 0xF5 || bufferCache[4] != 0xFC)
+            {
+                bufferCache.RemoveAt(0);
+                continue;
+            }
+
+            int groupId = bufferCache[2] & 0x1F;
+
+            lock (sceneAckLock)
+            {
+                if (groupId == waitingAckGroupId)
+                    waitingAckReceived = true;
+            }
+
+            Debug.Log($"ACK OK Group {groupId}");
+            msgQueue.Enqueue($"ACK OK Group {groupId}");
+
+            bufferCache.RemoveRange(0, 5);
+        }
+    }
+    
+    // public void SendBinFile(string filePath)
+    // {
+    //     StopAllCoroutines();
+    //     StartCoroutine(SendBinCoroutine(filePath));
+    // }
+    
     public void SendBinFile(string filePath)
     {
-        if (serialPort == null || !serialPort.IsOpen)
+        Debug.Log($"🔥 SendBinFile CALLED at {Time.realtimeSinceStartup:F2}");
+        stopRequested = false; // ⭐ 重置停止标志
+
+        if (sendCoroutine != null)
         {
-            Debug.LogError("串口未打开！");
-            return;
+            Debug.Log($"🛑 Stop OLD Coroutine at {Time.realtimeSinceStartup:F2}");
+            StopCoroutine(sendCoroutine);
         }
 
-        byte[] fileData = System.IO.File.ReadAllBytes(filePath);
-
-        //UILogger.Instance?.Log($"BIN send start: {fileData.Length} bytes");
-        msgQueue.Enqueue($"BIN send start: {fileData.Length} bytes");
-
-        int packetSize = 64;
-
-        for (int i = 0; i < fileData.Length; i += packetSize)
-        {
-            int len = Mathf.Min(packetSize, fileData.Length - i);
-
-            byte[] packet = new byte[len];
-            Array.Copy(fileData, i, packet, 0, len);
-
-            serialPort.Write(packet, 0, len);
-
-            Thread.Sleep(5);
-        }
-
-        //UILogger.Instance?.Log("BIN send done");
-        msgQueue.Enqueue("BIN send done");
+        sendCoroutine = StartCoroutine(SendBinCoroutine(filePath));
     }
+    
+    public void StopSendBin()
+    {
+        Debug.Log("手动停止发送");
+
+        stopRequested = true;
+
+        if (sendCoroutine != null)
+        {
+            StopCoroutine(sendCoroutine);
+            sendCoroutine = null;
+        }
+
+        msgQueue.Enqueue("BIN send stopped");
+    }
+
+    IEnumerator SendBinCoroutine(string path)
+    {
+        Debug.Log($"Coroutine START at {Time.realtimeSinceStartup:F2}");
+        byte[] file = File.ReadAllBytes(path);
+
+        int index = 0;
+        int groupIndex = 1;
+
+        while (index < file.Length)
+        {
+            if (stopRequested)
+            {
+                Debug.Log("🛑 STOP at main loop");
+                yield break;
+            }
+            // ===== 找一帧（F5 → FC）=====
+            if (file[index] != 0xF5)
+            {
+                index++;
+                continue;
+            }
+
+            int end = index;
+
+            while (end < file.Length && file[end] != 0xFC)
+                end++;
+
+            if (end >= file.Length)
+                break;
+
+            int length = end - index + 1;
+
+            byte[] frame = new byte[length];
+            Array.Copy(file, index, frame, 0, length);
+
+            // ===== 获取 groupId =====
+            int groupId = frame[1] & 0x1F;
+
+            // ===== 发送 =====
+            waitingAckGroupId = groupId;
+            waitingAckReceived = false;
+
+            serialPort.Write(frame, 0, frame.Length);
+
+            Debug.Log($"TX Group {groupId} Len={length}");
+
+            // ===== 等ACK =====
+            float startTime = Time.realtimeSinceStartup;
+            
+
+            while (true)
+            {
+                if (stopRequested)
+                {
+                    Debug.Log("🛑 STOP during ACK wait");
+                    yield break;
+                }
+                // ⭐ 收到ACK
+                if (waitingAckReceived)
+                    break;
+
+                // ⭐ 超时判断
+                if (Time.realtimeSinceStartup - startTime >= sceneGroupAckTimeoutSeconds)
+                    break;
+                
+                float elapsed = Time.realtimeSinceStartup - startTime;
+                
+                // // ⭐ 每1秒打印一次
+                // if (Mathf.FloorToInt(elapsed) % 1 == 0)
+                // {
+                //     Debug.Log($"[WAITING] Group={groupId} t={elapsed:F1}s");
+                // }
+
+                if (elapsed >= sceneGroupAckTimeoutSeconds)
+                {
+                    Debug.Log($"[WAIT BREAK] TIMEOUT Group={groupId}");
+                    break;
+                }
+
+                yield return null;
+            }
+
+            if (!waitingAckReceived)
+            {
+                Debug.Log($"ACK TIMEOUT Group {groupId}");
+                msgQueue.Enqueue($"ACK TIMEOUT Group {groupId}");
+            }
+
+            index = end + 1;
+            groupIndex++;
+            
+            if (stopRequested)
+            {
+                Debug.Log("🛑 STOP after frame");
+                yield break;
+            }
+
+            yield return null;
+        }
+
+        Debug.Log("BIN send done");
+        msgQueue.Enqueue($"BIN send done");
+        
+        Debug.Log($"Coroutine END at {Time.realtimeSinceStartup:F2}");
+    }
+    
+    
+    
+    
+    // public void SendBinFile(string filePath)
+    // {
+    //     if (serialPort == null || !serialPort.IsOpen)
+    //     {
+    //         Debug.LogError("串口未打开！");
+    //         return;
+    //     }
+    //
+    //     byte[] fileData = System.IO.File.ReadAllBytes(filePath);
+    //
+    //     //UILogger.Instance?.Log($"BIN send start: {fileData.Length} bytes");
+    //     msgQueue.Enqueue($"BIN send start: {fileData.Length} bytes");
+    //
+    //     int packetSize = 64;
+    //
+    //     for (int i = 0; i < fileData.Length; i += packetSize)
+    //     {
+    //         int len = Mathf.Min(packetSize, fileData.Length - i);
+    //
+    //         byte[] packet = new byte[len];
+    //         Array.Copy(fileData, i, packet, 0, len);
+    //
+    //         serialPort.Write(packet, 0, len);
+    //
+    //         Thread.Sleep(5);
+    //     }
+    //
+    //     //UILogger.Instance?.Log("BIN send done");
+    //     msgQueue.Enqueue("BIN send done");
+    // }
 }

@@ -19,6 +19,8 @@ public class SerialUIController : MonoBehaviour
     
     private string selectedFilePath;
     public TMP_Text btnText;
+    
+    public GameObject stopSendButton; // ⭐ 拖UI按钮
 
     private bool isOpen;
     
@@ -32,6 +34,7 @@ public class SerialUIController : MonoBehaviour
         InitBaudRates();
         isOpen = false;
         btnText.text = "打开串口";
+        stopSendButton.SetActive(false); // ⭐ 默认隐藏
     }
 
     // ===== 刷新串口 =====
@@ -155,6 +158,16 @@ public class SerialUIController : MonoBehaviour
         }
 
         SerialManager.Instance.SendBinFile(selectedFilePath);
+        // ⭐ 显示停止按钮
+        stopSendButton.SetActive(true);
+    }
+    
+    public void OnStopSend()
+    {
+        SerialManager.Instance.StopSendBin();
+
+        // ⭐ 隐藏按钮
+        stopSendButton.SetActive(false);
     }
     
     // ===== 按钮调用这个 =====
