@@ -1,8 +1,11 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using TMPro;
 
 public class DragRotate : MonoBehaviour
 {
+    public TMP_FontAsset targetFont;
+    public TMP_FontAsset font2;
     [Header("双击复位（仅编辑模式，串口模式下无效）")]
     [Tooltip("两次左键按下间隔小于此值则视为双击")]
     public float doubleClickMaxInterval = 0.45f;
@@ -40,6 +43,19 @@ public class DragRotate : MonoBehaviour
     bool pendingFirstClickQualified;
     bool skipLeftDragFromDoubleClick;
 
+    void Awake()
+    {
+        // 强制在主线程初始化字体，杜绝线程报错
+        if (targetFont != null)
+        {
+            targetFont.ReadFontAssetDefinition();
+        }
+        if (font2 != null)
+        {
+            font2.ReadFontAssetDefinition();
+        }
+        
+    }
     void Start()
     {
         if (uiStateController == null)
@@ -91,7 +107,18 @@ public class DragRotate : MonoBehaviour
             t - lastLeftDownTime <= doubleClickMaxInterval &&
             distOk)
         {
-            ResetRotation();
+            ResetController resetController = FindObjectOfType<ResetController>();
+            if (resetController != null)
+            {
+                resetController.ResetAll();
+            }
+            
+            // 清空 Face 下拉框，让它不会弹回面朝某一面
+            FaceDropdown faceDropdown = FindObjectOfType<FaceDropdown>();
+            if (faceDropdown != null)
+            {
+                faceDropdown.faceDropdown.SetValueWithoutNotify(0);
+            }
             dragLeft = false;
             pendingFirstClickQualified = false;
             lastLeftDownTime = 0f;

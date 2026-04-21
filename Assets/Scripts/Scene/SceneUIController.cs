@@ -568,4 +568,50 @@ public class SceneUIController : MonoBehaviour
 
         ApplyCurrentSelectionToLamps();
     }
+    // ==========================
+// 【新增】删除当前选中的场景
+// ==========================
+    public void OnClickDeleteScene()
+    {
+        if (saver == null || dropdown == null)
+        {
+            Debug.LogWarning("未绑定 saver 或 dropdown");
+            return;
+        }
+
+        // 1. 如果正在编辑场景，禁止删除
+        if (BlockIfEditingScene())
+            return;
+
+        // 2. 检查是否有场景可删
+        if (saver.scenes.Count == 0)
+        {
+            ShowInsertWarning("场景列表为空，无法删除！");
+            return;
+        }
+
+        // 3. 检查当前选中是否合法
+        int selectedIndex = dropdown.value;
+        if (selectedIndex < 0 || selectedIndex >= saver.scenes.Count)
+        {
+            ShowInsertWarning("请先选择要删除的场景！");
+            return;
+        }
+
+        // 4. 执行删除
+        saver.scenes.RemoveAt(selectedIndex);
+        Debug.Log($"已删除场景：{selectedIndex + 1}");
+
+        // 5. 刷新下拉列表
+        RefreshDropdown();
+
+        // 6. 如果删完还有场景，自动选中第一个
+        if (saver.scenes.Count > 0)
+        {
+            dropdown.value = 0;
+            dropdown.RefreshShownValue();
+            lastDropdownValue = 0;
+            ApplyCurrentSelectionToLamps();
+        }
+    }
 }

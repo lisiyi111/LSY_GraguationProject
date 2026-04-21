@@ -34,9 +34,9 @@ public class SerialManager : MonoBehaviour
     private bool stopRequested = false;
     
 
-    [Header("Scene BIN send")]
+    [Header("Ack Timeout Seconds")]
     [Min(0.05f)]
-    public float sceneGroupAckTimeoutSeconds = 50f;
+    public float sceneGroupAckTimeoutSeconds = 1f;//根据下位机延迟时间决定
 
     private static readonly int[] SceneGroupLampCounts =
     {
