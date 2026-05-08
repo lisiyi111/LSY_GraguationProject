@@ -29,14 +29,6 @@ public class FaceRotator : MonoBehaviour
 
     public void RotateToFaceDir(Transform faceDir)
     {
-        // Vector3 from = faceDir.forward;                 // 该“面”的方向
-        // Vector3 to = -mainCamera.transform.forward;     // 镜头方向
-        //
-        // Quaternion delta = Quaternion.FromToRotation(from, to);
-        // targetRotation = delta * transform.rotation;
-        //
-        // rotating = true;
-        // 目标：让 faceDir 的 Z 轴（正面）朝向相机
         Vector3 faceZ = faceDir.forward;
         Vector3 faceY = faceDir.up; // 你设置的：朝下
 

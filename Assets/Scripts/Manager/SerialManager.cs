@@ -33,10 +33,12 @@ public class SerialManager : MonoBehaviour
     
     private bool stopRequested = false;
     
+    private string textCache = "";
+    
 
     [Header("Ack Timeout Seconds")]
     [Min(0.05f)]
-    public float sceneGroupAckTimeoutSeconds = 1f;//根据下位机延迟时间决定
+    public float sceneGroupAckTimeoutSeconds = 0.1f;//根据下位机延迟时间决定
 
     private static readonly int[] SceneGroupLampCounts =
     {
@@ -83,22 +85,47 @@ public class SerialManager : MonoBehaviour
         }
     }
     
+    // void HandleData(byte[] buffer)
+    // {
+    //     // ===== 拼包缓存 =====
+    //     bufferCache.AddRange(buffer);
+    //     
+    //     // ===== 解析 =====
+    //     TryParseBuffer();
+    //     
+    //     // ===== 直接识别ACK =====
+    //     TryParseAck();
+    //     
+    //     // ===== 字符串协议 =====
+    //     string text = System.Text.Encoding.UTF8.GetString(buffer);
+    //
+    //     if (!string.IsNullOrWhiteSpace(text))
+    //         ParseTextProtocol(text);
+    // }
     void HandleData(byte[] buffer)
     {
-        // ===== 拼包缓存 =====
+        // ===== 拼二进制帧 =====
         bufferCache.AddRange(buffer);
         
-        // ===== 直接识别ACK =====
-        TryParseAck();
+        TryParseBuffer();   // F2帧
+        
+        
+        TryParseAck();      // ACK
 
-        // ===== 解析 =====
-        TryParseBuffer();
+        // ===== 拼字符串（解决拆包）=====
+        string chunk = System.Text.Encoding.UTF8.GetString(buffer);
 
-        // ===== 字符串协议 =====
-        string text = System.Text.Encoding.UTF8.GetString(buffer);
+        if (!string.IsNullOrWhiteSpace(chunk))
+        {
+            textCache += chunk;
 
-        if (!string.IsNullOrWhiteSpace(text))
-            ParseTextProtocol(text);
+            // ⭐ 按换行或完整关键字截断
+            if (textCache.Contains("\n") || textCache.Contains("RUN_") || textCache.Contains("F6 OK"))
+            {
+                ParseTextProtocol(textCache);
+                textCache = ""; // 清空缓存
+            }
+        }
     }
 
     public void SetPort(string port, int baud)
@@ -185,15 +212,16 @@ public class SerialManager : MonoBehaviour
                         
                         lock (lockObj)
                         {
-                            msgQueue.Enqueue("HEX: " + BitConverter.ToString(buffer));
-
-                            string text = System.Text.Encoding.UTF8.GetString(buffer);
-
-                            if (!string.IsNullOrWhiteSpace(text))
-                                msgQueue.Enqueue("STR: " + text);
+                            dataQueue.Enqueue(buffer); // ⭐ 只传数据，不打印
+                            
+                            // msgQueue.Enqueue("HEX: " + BitConverter.ToString(buffer));
+                            //
+                            // string text = System.Text.Encoding.UTF8.GetString(buffer);
+                            //
+                            // if (!string.IsNullOrWhiteSpace(text))
+                            //     msgQueue.Enqueue("STR: " + text);
 
                             // ⭐ 只丢数据，不解析
-                            dataQueue.Enqueue(buffer);
                         }
                     }
                 }
@@ -212,16 +240,23 @@ public class SerialManager : MonoBehaviour
     
     void ParseTextProtocol(string text)
     {
+        text = text.Trim();
+
         if (text.Contains("RUN_"))
         {
-            msgQueue.Enqueue("Feedback on performance : " + text);
+            msgQueue.Enqueue("Feedback on performance: " + text);
+            return;
         }
 
         if (text.Contains("F6 OK"))
         {
             msgQueue.Enqueue("Clearing successful");
+            return;
         }
+        
+        msgQueue.Enqueue("RX: " + text);
     }
+   
     
     void TryParseBuffer()
     {

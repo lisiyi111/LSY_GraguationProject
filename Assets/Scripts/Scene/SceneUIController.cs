@@ -549,25 +549,25 @@ public class SceneUIController : MonoBehaviour
     }
 
     /// <summary>兼容旧按钮绑定；平时选下拉即可自动应用。</summary>
-    public void ApplyFromDropdown()
-    {
-        if (saver == null || dropdown == null) return;
-        if (BlockIfEditingScene()) return;
-        if (saver.scenes.Count == 0)
-        {
-            Debug.LogWarning("当前没有可应用的场景");
-            return;
-        }
-
-        if (isEditingDropdownScene)
-        {
-            int prev = lastDropdownValue;
-            if (prev >= 0 && prev < saver.scenes.Count)
-                saver.scenes[prev] = saver.CaptureCurrentScene();
-        }
-
-        ApplyCurrentSelectionToLamps();
-    }
+    // public void ApplyFromDropdown()
+    // {
+    //     if (saver == null || dropdown == null) return;
+    //     if (BlockIfEditingScene()) return;
+    //     if (saver.scenes.Count == 0)
+    //     {
+    //         Debug.LogWarning("当前没有可应用的场景");
+    //         return;
+    //     }
+    //
+    //     if (isEditingDropdownScene)
+    //     {
+    //         int prev = lastDropdownValue;
+    //         if (prev >= 0 && prev < saver.scenes.Count)
+    //             saver.scenes[prev] = saver.CaptureCurrentScene();
+    //     }
+    //
+    //     ApplyCurrentSelectionToLamps();
+    // }
     // ==========================
 // 【新增】删除当前选中的场景
 // ==========================
